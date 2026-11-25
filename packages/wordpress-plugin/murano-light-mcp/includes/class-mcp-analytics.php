@@ -441,6 +441,21 @@ class Murano_Light_MCP_Analytics {
 			ARRAY_A
 		);
 
+		// Index current catalog variants by SKU so historical hits can show size & colour instead of opaque sub-SKU codes.
+		$catalog_by_sku = array();
+		if ( class_exists( 'Murano_Light_MCP_Catalog' ) ) {
+			foreach ( Murano_Light_MCP_Catalog::get_variants() as $cv ) {
+				$csku = (string) ( $cv['sku'] ?? '' );
+				if ( '' !== $csku ) {
+					$catalog_by_sku[ $csku ] = array(
+						'size'   => (string) ( $cv['size'] ?? '' ),
+						'colour' => (string) ( $cv['colour'] ?? '' ),
+						'price'  => $cv['price_usd'] ?? null,
+					);
+				}
+			}
+		}
+
 		$product_map = array();
 		foreach ( $prod_rows as $pr ) {
 			$items = json_decode( (string) $pr['matched_items'], true );
@@ -460,18 +475,33 @@ class Murano_Light_MCP_Analytics {
 				if ( ! isset( $product_map[ $key ] ) ) {
 					$fallback_parent = '' !== $sku ? (string) preg_replace( '/-\d{1,3}$/', '', $sku ) : '';
 					$product_map[ $key ] = array(
-						'name'         => $name ?: $sku,
-						'slug'         => $slug,
-						'product_id'   => 0,
-						'parent_sku'   => $fallback_parent,
-						'variant_skus' => array(),
-						'total_hits'   => 0,
-						'spec_lookups' => 0,
-						'rec_hits'     => 0,
+						'name'             => $name ?: $sku,
+						'slug'             => $slug,
+						'product_id'       => 0,
+						'parent_sku'       => $fallback_parent,
+						'variant_skus'     => array(),
+						'matched_variants' => array(),
+						'total_hits'       => 0,
+						'spec_lookups'     => 0,
+						'rec_hits'         => 0,
 					);
 				}
 				if ( '' !== $sku ) {
 					$product_map[ $key ]['variant_skus'][ $sku ] = ( $product_map[ $key ]['variant_skus'][ $sku ] ?? 0 ) + 1;
+					$v_size   = (string) ( $it['size'] ?? ( $catalog_by_sku[ $sku ]['size'] ?? '' ) );
+					$v_colour = (string) ( $it['colour'] ?? ( $catalog_by_sku[ $sku ]['colour'] ?? '' ) );
+					$v_price  = $catalog_by_sku[ $sku ]['price'] ?? null;
+					$parts    = array_filter( array( trim( $v_size ), trim( $v_colour ) ) );
+					$label    = ! empty( $parts ) ? implode( ' · ', $parts ) : $sku;
+					if ( ! isset( $product_map[ $key ]['matched_variants'][ $sku ] ) ) {
+						$product_map[ $key ]['matched_variants'][ $sku ] = array(
+							'sku'   => $sku,
+							'label' => $label,
+							'price' => $v_price,
+							'hits'  => 0,
+						);
+					}
+					$product_map[ $key ]['matched_variants'][ $sku ]['hits']++;
 				}
 				if ( ! isset( $seen_in_event[ $key ] ) ) {
 					$seen_in_event[ $key ] = true;
@@ -528,6 +558,13 @@ class Murano_Light_MCP_Analytics {
 					}
 				}
 				arsort( $tp['variant_skus'] );
+				uasort(
+					$tp['matched_variants'],
+					function ( $a, $b ) {
+						return $b['hits'] <=> $a['hits'];
+					}
+				);
+				$tp['matched_variants'] = array_values( $tp['matched_variants'] );
 			}
 			unset( $tp );
 		}

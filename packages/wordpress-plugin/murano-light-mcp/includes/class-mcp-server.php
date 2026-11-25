@@ -500,9 +500,11 @@ class Murano_Light_MCP_Server {
 					}
 					$seen_variants[ $vk ] = true;
 					$matched_items[]      = array(
-						'slug' => $slug,
-						'name' => $name ?: $sku,
-						'sku'  => $sku,
+						'slug'   => $slug,
+						'name'   => $name ?: $sku,
+						'sku'    => $sku,
+						'size'   => (string) ( $v['size'] ?? '' ),
+						'colour' => (string) ( $v['colour'] ?? '' ),
 					);
 					if ( count( $matched_items ) >= 12 ) {
 						break;

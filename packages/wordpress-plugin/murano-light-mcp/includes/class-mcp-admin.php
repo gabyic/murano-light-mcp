@@ -342,8 +342,8 @@ class Murano_Light_MCP_Admin {
 				.murano-prod-title { font-weight: 600; text-decoration: none; }
 				.murano-edit-link { font-size: 11px; margin-left: 6px; color: #646970; text-decoration: none; border: 1px solid #dcdcde; border-radius: 3px; padding: 1px 5px; }
 				.murano-edit-link:hover { color: #2271b1; border-color: #2271b1; }
-				.murano-var-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-				.murano-var-tag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: #f6f7f7; color: #50575e; border: 1px solid #e2e4e7; border-radius: 3px; padding: 1px 5px; }
+				.murano-var-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+				.murano-var-tag { font-size: 11.5px; line-height: 1.35; background: #f6f7f7; color: #3c434a; border: 1px solid #e2e4e7; border-radius: 4px; padding: 2px 7px; }
 				.murano-parent-sku { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; font-weight: 600; color: #1d2327; background: #f0f6fc; border: 1px solid #c5d9ed; border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
 
 				.murano-seg { display: inline-flex; background: #f0f0f1; border-radius: 5px; padding: 2px; gap: 2px; }
@@ -637,8 +637,8 @@ class Murano_Light_MCP_Admin {
 								<?php foreach ( $stats['top_products'] as $p ) : ?>
 									<?php
 									$edit_url     = ! empty( $p['product_id'] ) ? get_edit_post_link( (int) $p['product_id'], 'raw' ) : '';
-									$variant_skus = is_array( $p['variant_skus'] ?? null ) ? array_slice( $p['variant_skus'], 0, 4, true ) : array();
-									$more_vars    = is_array( $p['variant_skus'] ?? null ) ? max( 0, count( $p['variant_skus'] ) - 4 ) : 0;
+									$matched_vars = is_array( $p['matched_variants'] ?? null ) ? array_slice( $p['matched_variants'], 0, 4 ) : array();
+									$more_vars    = is_array( $p['matched_variants'] ?? null ) ? max( 0, count( $p['matched_variants'] ) - 4 ) : 0;
 									?>
 									<tr>
 										<td>
@@ -652,10 +652,17 @@ class Murano_Light_MCP_Admin {
 													<a class="murano-edit-link" href="<?php echo esc_url( $edit_url ); ?>"><?php esc_html_e( 'Edit', 'murano-light-mcp' ); ?></a>
 												<?php endif; ?>
 											</div>
-											<?php if ( ! empty( $variant_skus ) ) : ?>
-												<div class="murano-var-tags" title="<?php esc_attr_e( 'Specific variation SKUs returned to customers', 'murano-light-mcp' ); ?>">
-													<?php foreach ( $variant_skus as $vsku => $vcnt ) : ?>
-														<span class="murano-var-tag"><?php echo esc_html( $vsku ); ?><?php echo $vcnt > 1 ? ' ×' . esc_html( (string) $vcnt ) : ''; ?></span>
+											<?php if ( ! empty( $matched_vars ) ) : ?>
+												<div class="murano-var-tags">
+													<?php foreach ( $matched_vars as $mv ) : ?>
+														<?php
+														$vlabel = (string) ( $mv['label'] ?? $mv['sku'] ?? '' );
+														$vprice = isset( $mv['price'] ) && null !== $mv['price'] ? ' · $' . number_format_i18n( (float) $mv['price'] ) : '';
+														$vhits  = (int) ( $mv['hits'] ?? 1 );
+														?>
+														<span class="murano-var-tag" title="<?php echo esc_attr( 'SKU: ' . ( $mv['sku'] ?? '' ) ); ?>">
+															<?php echo esc_html( $vlabel . $vprice ); ?><?php echo $vhits > 1 ? ' ×' . esc_html( (string) $vhits ) : ''; ?>
+														</span>
 													<?php endforeach; ?>
 													<?php if ( $more_vars > 0 ) : ?>
 														<span class="murano-muted">+<?php echo esc_html( (string) $more_vars ); ?></span>
