@@ -2,260 +2,402 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Murano Light MCP 1.3.0\n"
 "Report-Msgid-Bugs-To: https://github.com/gabyic/murano-light-mcp/issues\n"
-"POT-Creation-Date: 2026-11-25 10:45+0800\n"
-"PO-Revision-Date: 2026-11-25 10:45+0800\n"
+"POT-Creation-Date: 2026-11-25 11:00+0800\n"
+"PO-Revision-Date: 2026-11-25 11:00+0800\n"
 "Language-Team: Chinese (China)\n"
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Unknown"
-msgstr "未知地区"
+#, php-format
+msgid "%1$s total hits incl. connections (%2$d%% searches)"
+msgstr "含连接握手共 %1$s 次请求（有效选品占比 %2$d%%）"
 
-msgid "Tor / Anon Proxy"
-msgstr "Tor / 匿名代理"
+#, php-format
+msgid "%d sellable variants indexed"
+msgstr "已索引 %d 个可售变体"
 
-msgid "Murano MCP Analytics"
-msgstr "Murano MCP 统计"
-
-msgid "Murano MCP"
-msgstr "Murano MCP"
-
-msgid "Unauthorized"
-msgstr "无权限访问"
-
-msgid "Murano Light MCP"
-msgstr "Murano Light MCP"
-
-msgid "Public read-only AI discovery analytics, variant demand, and inventory gap signals."
-msgstr "公开只读 AI 导购调用统计、热门商品需求与缺款信号。"
-
-msgid "Timeframe"
-msgstr "时间窗口"
-
-msgid "Today"
-msgstr "今日"
-
-msgid "7 Days"
-msgstr "近 7 天"
+#, php-format
+msgid "%s conversations"
+msgstr "共 %s 次对话"
 
 msgid "30 Days"
 msgstr "近 30 天"
 
-msgid "Catalog index cache cleared. The next MCP call will re-index the latest feed/product data."
-msgstr "已清理 MCP 目录缓存，下次调用将重新索引最新 Feed/商品数据。"
+msgid "7 Days"
+msgstr "近 7 天"
 
-msgid "MCP 2025-03-26 · Read-Only"
-msgstr "MCP 2025-03-26 · 只读"
+msgid "AI Endpoint:"
+msgstr "AI 接入地址："
 
-msgid "Copy URL"
-msgstr "复制端点"
+msgid "AI Search / Tool"
+msgstr "AI 选品工具"
 
-msgid "Copied"
-msgstr "已复制"
+msgid "AI Searches & Lookups"
+msgstr "AI 选品查询次数"
 
-msgid "Test Live Endpoint"
-msgstr "检测连通性"
-
-#, php-format
-msgid "%d public variants indexed"
-msgstr "已索引 %d 条公开变体"
-
-msgid "Refresh Catalog Cache"
-msgstr "刷新商品索引缓存"
-
-msgid "Business Calls (Tools / Resources)"
-msgstr "有效业务调用（Tools / Resources）"
-
-#, php-format
-msgid "%1$s total reqs (%2$d%% biz)"
-msgstr "总请求 %1$s（业务占比 %2$d%%）"
-
-msgid "Unique Callers (90d Anon Hash)"
-msgstr "独立调用者（90 天匿名哈希）"
-
-#, php-format
-msgid "Sessions: %s"
-msgstr "独立会话：%s"
-
-msgid "Zero-Match Queries (Inventory Gaps)"
-msgstr "无匹配查询（缺款信号）"
-
-msgid "AI searched with 0 catalog hits"
-msgstr "AI 未在目录找到匹配商品"
-
-msgid "Inspect ↓"
-msgstr "查看缺口 ↓"
-
-msgid "Errors & Rate Limits (429)"
-msgstr "异常 / 限流拦截 (429)"
-
-msgid "Review 429s or invalid args"
-msgstr "建议排查 429 限流或参数报错"
-
-msgid "Filter ↓"
-msgstr "仅看异常 ↓"
-
-msgid "Healthy · no blocked requests"
-msgstr "运行健康 · 无异常拦截"
-
-msgid "Daily Request Trend (UTC)"
-msgstr "按天请求趋势（UTC）"
-
-#, php-format
-msgid "Chronological %d-day volume"
-msgstr "近 %d 天按日调用趋势"
-
-msgid "Daily MCP request volume chart"
-msgstr "MCP 每日请求量柱状图"
-
-msgid "Business Calls"
-msgstr "有效业务调用"
-
-msgid "Total Reqs (incl. Handshakes)"
-msgstr "总请求（含握手）"
-
-#, php-format
-msgid "Peak day: %s reqs"
-msgstr "单日峰值：%s 次"
-
-msgid "Caller Countries"
-msgstr "调用者国家 / 地区"
-
-msgid "ISO-3166 · zero raw IP stored"
-msgstr "仅存 ISO-3166 国家码 · 不存原始 IP"
-
-msgid "No country signals recorded in this time window yet."
-msgstr "当前时间窗口暂无国家地区数据。"
-
-msgid "Top AI-Requested Products (Top 15)"
-msgstr "最受 AI 欢迎的商品 Top 15"
-
-msgid "Specs lookups + recommendations"
-msgstr "详情精查 + 选型推荐汇总"
-
-msgid "Product"
-msgstr "商品名称"
-
-msgid "SKU"
-msgstr "参考 SKU"
-
-msgid "Total"
-msgstr "总命中"
-
-msgid "Specs"
-msgstr "精查"
-
-msgid "Recs"
-msgstr "推荐"
-
-msgid "No product hits recorded in this window."
-msgstr "当前时间窗口暂无商品命中记录。"
-
-msgid "Edit"
-msgstr "编辑"
-
-msgid "AI Query Demand & Gaps"
-msgstr "AI 查询需求与缺款信号"
-
-msgid "Query view"
-msgstr "查询视图切换"
-
-#, php-format
-msgid "Zero-Match Gaps (%d)"
-msgstr "零命中缺口 (%d)"
-
-msgid "All Top Queries"
-msgstr "全部热门参数"
-
-msgid "Tool"
-msgstr "工具"
-
-msgid "Unmet Query Parameters"
-msgstr "未匹配参数摘要"
-
-msgid "Misses"
-msgstr "缺口次数"
-
-msgid "Last Seen"
-msgstr "最近触发"
-
-msgid "No zero-match queries in this window. Every AI search matched catalog variants."
-msgstr "当前时间窗口无零命中查询，AI 检索均匹配到目录变体。"
-
-msgid "Arguments"
-msgstr "传入参数摘要"
-
-msgid "Calls"
-msgstr "调用次数"
-
-msgid "Avg Hits"
-msgstr "平均命中"
-
-msgid "No parameterized tool calls recorded in this window."
-msgstr "当前时间窗口暂无查询参数记录。"
-
-msgid "Tool & Resource Usage Breakdown"
-msgstr "工具与资源调用分布"
-
-msgid "Includes tools/call, resources/read, and prompts/get"
-msgstr "统计 tools/call、resources/read 与 prompts/get"
-
-msgid "Tool / Resource URI"
-msgstr "Tool / 资源 URI"
-
-msgid "JSON-RPC Method"
-msgstr "方法"
-
-msgid "Unique Callers"
-msgstr "独立调用者"
-
-msgid "Errors"
-msgstr "错误数"
-
-msgid "No tool invocations recorded yet."
-msgstr "暂无调用记录。"
-
-msgid "Recent Activity Log (Latest 30)"
-msgstr "最近 30 条业务调用流水"
+msgid "Action"
+msgstr "客户操作"
 
 msgid "All"
 msgstr "全部"
 
-msgid "Zero-Match"
-msgstr "仅零命中"
+msgid "All Actions"
+msgstr "全部操作"
 
-msgid "Errors / 429"
-msgstr "仅异常 / 429"
+msgid "All Connections"
+msgstr "全部请求（含握手）"
 
-msgid "Filter by tool"
-msgstr "按工具筛选"
+msgid "All systems normal"
+msgstr "运行正常，无异常拦截"
 
-msgid "All Tools"
-msgstr "全部工具 / 方法"
+msgid "Anonymous visitor ID (no raw IP stored)"
+msgstr "匿名访客编号（不存储原始 IP）"
+
+msgid "Avg Items Found"
+msgstr "平均匹配款数"
+
+msgid "Bedside"
+msgstr "床头区域"
+
+msgid "Blocked"
+msgstr "已拦截"
+
+msgid "Blocked / Errors"
+msgstr "异常 / 限流"
+
+msgid "Blocked / Failed Requests"
+msgstr "异常 / 拦截次数"
+
+msgid "Blog Guide Read"
+msgstr "查看博客攻略"
+
+msgid "Budget"
+msgstr "预算上限"
+
+msgid "Buying Guide Read"
+msgstr "看选灯攻略"
+
+msgid "Category"
+msgstr "灯具分类"
+
+msgid "Ceiling"
+msgstr "层高"
+
+msgid "Ceiling Fit Check"
+msgstr "层高适配测算"
+
+msgid "Ceiling Lights"
+msgstr "吸顶灯"
+
+msgid "Chandeliers"
+msgstr "枝形吊灯"
+
+msgid "Copied"
+msgstr "已复制"
+
+msgid "Copy URL"
+msgstr "复制地址"
+
+msgid "Country & Visitor"
+msgstr "国家与访客"
+
+msgid "Country only · no raw IPs stored"
+msgstr "仅统计国家 · 不存原始 IP"
+
+msgid "Customer Action"
+msgstr "客户操作"
+
+msgid "Customer Filters"
+msgstr "筛选条件"
+
+msgid "Customer Requests & Inventory Gaps"
+msgstr "客户搜索需求与缺款信号"
+
+msgid "Daily AI Activity Trend"
+msgstr "每日 AI 选品趋势"
+
+msgid "Daily AI search volume chart"
+msgstr "每日 AI 搜索量柱状图"
+
+msgid "Discovery Card"
+msgstr "自动发现卡"
+
+msgid "Edit"
+msgstr "编辑"
+
+msgid "Error"
+msgstr "报错"
+
+msgid "Errors"
+msgstr "异常数"
+
+msgid "Feature"
+msgstr "功能模块"
+
+msgid "Feature Usage Breakdown"
+msgstr "各功能使用分布"
+
+msgid "Filter by feature"
+msgstr "按功能筛选"
+
+msgid "Filter ↓"
+msgstr "仅看异常 ↓"
+
+msgid "Finish"
+msgstr "颜色 / 材质"
+
+msgid "General browse"
+msgstr "通用浏览"
+
+msgid "Guide"
+msgstr "攻略文章"
+
+msgid "Guided Flow"
+msgstr "导购流程"
+
+msgid "How AI shopping assistants use your store capabilities"
+msgstr "AI 导购在店铺中调用了哪些选品与咨询能力"
+
+msgid "Initial Connection"
+msgstr "首次建立连接"
+
+msgid "Item"
+msgstr "指定商品"
+
+msgid "Items Found"
+msgstr "匹配结果"
+
+msgid "Keyword"
+msgstr "关键词"
 
 #, php-format
-msgid "Time (%s)"
-msgstr "时间 (%s)"
+msgid "Last %d days (UTC day buckets)"
+msgstr "近 %d 天统计（按 UTC 日切分）"
 
-msgid "Country & Caller"
-msgstr "国家与调用者"
+msgid "Last Seen"
+msgstr "最近触发"
 
-msgid "Method / Tool"
-msgstr "方法 / 工具"
+msgid "Lighting Consultation"
+msgstr "灯具导购咨询"
 
-msgid "Parameters"
-msgstr "参数摘要"
+msgid "Local Time"
+msgstr "本地时间"
 
-msgid "Hits"
-msgstr "命中数"
+msgid "Matched"
+msgstr "正常命中"
 
-msgid "Status"
+msgid "Max Height"
+msgstr "限高"
+
+msgid "Missed Searches (No Match)"
+msgstr "无匹配查询（缺款信号）"
+
+msgid "Misses"
+msgstr "未命中次数"
+
+msgid "Most Recommended Products (Top 15)"
+msgstr "最受 AI 推荐商品 Top 15"
+
+msgid "Murano Light AI Shopping Insights"
+msgstr "Murano Light AI 导购看板"
+
+msgid "Murano MCP"
+msgstr "Murano MCP"
+
+msgid "Murano MCP Analytics"
+msgstr "Murano MCP 导购统计"
+
+msgid "No Match"
+msgstr "缺款信号"
+
+msgid "No country data recorded in this window yet."
+msgstr "当前时间窗口暂无国家地区数据。"
+
+msgid "No customer search criteria recorded yet."
+msgstr "当前时间窗口暂无客户筛选条件记录。"
+
+msgid "No matching activity in this window."
+msgstr "当前筛选条件下暂无访问流水。"
+
+msgid "No missed searches in this window — every customer query matched store fixtures."
+msgstr "当前时间窗口无缺款信号，所有客户搜款均匹配到在售灯具。"
+
+msgid "No product hits recorded in this window."
+msgstr "当前时间窗口暂无商品推荐记录。"
+
+msgid "No usage recorded yet."
+msgstr "暂无功能调用记录。"
+
+#, php-format
+msgid "No-Match Gaps (%d)"
+msgstr "缺款信号 (%d)"
+
+msgid "OK"
+msgstr "正常"
+
+msgid "Online · Read-Only"
+msgstr "运行中 · 只读导购"
+
+msgid "Outcome"
 msgstr "状态"
 
-msgid "No matching log events in this window."
-msgstr "当前筛选条件下暂无流水记录。"
+msgid "Over Dining Table"
+msgstr "餐桌上方"
 
-msgid "Salted SHA-256 caller fingerprint (never stores raw IP)"
-msgstr "加盐 SHA-256 匿名指纹（永不存储原始 IP）"
+msgid "Parent SKU + matched variant sizes/finishes"
+msgstr "展示母款号（SKU）及命中的具体子变体规格"
+
+#, php-format
+msgid "Peak day: %s hits"
+msgstr "单日峰值：%s 次"
+
+msgid "Pendant Lights"
+msgstr "单头吊灯"
+
+msgid "Placement"
+msgstr "安装位置"
+
+msgid "Popular Requests"
+msgstr "热门搜款条件"
+
+msgid "Product & Matched Variants"
+msgstr "商品名称与命中变体"
+
+msgid "Product SKU"
+msgstr "商品款号 (SKU)"
+
+msgid "Product Search"
+msgstr "找灯搜款"
+
+msgid "Product Searches & Lookups"
+msgstr "选品查询与查规格"
+
+msgid "Product catalog cache refreshed. The next AI query will index your latest product data."
+msgstr "已刷新商品目录缓存，下次 AI 查询将读取最新商品与变体数据。"
+
+msgid "Query view"
+msgstr "需求视图切换"
+
+msgid "Rate Limit Triggered"
+msgstr "触发频率限制"
+
+msgid "Rate Limited"
+msgstr "触发限流"
+
+msgid "Rate limits or invalid inputs"
+msgstr "限流拦截或参数异常"
+
+msgid "Recent AI Visitor Activity (Latest 30)"
+msgstr "最近 30 条 AI 访客流水"
+
+msgid "Recommended"
+msgstr "被推荐"
+
+msgid "Refresh Catalog Cache"
+msgstr "刷新商品缓存"
+
+msgid "Request Details"
+msgstr "客户需求条件"
+
+msgid "Requests where no fixture matched"
+msgstr "客户找了但店里没有匹配款的次数"
+
+msgid "Room"
+msgstr "安装空间"
+
+msgid "See gaps ↓"
+msgstr "查看缺款 ↓"
+
+msgid "See which fixtures AI assistants recommend most, where visitors come from, and which sizing requests have no match."
+msgstr "查看 AI 导购最常推荐哪款灯、客户来自哪个国家，以及哪些尺寸/款式需求找不到货。"
+
+msgid "Served"
+msgstr "已提供"
+
+msgid "Spec Lookup"
+msgstr "查规格详情"
+
+msgid "Spec Views"
+msgstr "精查详情"
+
+msgid "Specific variation SKUs returned to customers"
+msgstr "返回给客户的具体子变体 SKU"
+
+msgid "Stairwell"
+msgstr "楼梯间"
+
+msgid "Store Content"
+msgstr "店铺文章 / 政策"
+
+msgid "Store Policy Check"
+msgstr "查产地与售后"
+
+msgid "Store Policy Doc"
+msgstr "店铺政策文档"
+
+msgid "Table H"
+msgstr "桌高"
+
+msgid "Table Lamps"
+msgstr "台灯"
+
+msgid "Table W"
+msgstr "桌宽"
+
+msgid "Test Connection"
+msgstr "检测连通性"
+
+msgid "Timeframe"
+msgstr "时间窗口"
+
+msgid "Times Asked"
+msgstr "查询次数"
+
+msgid "Today"
+msgstr "今日"
+
+msgid "Tor / Anon Proxy"
+msgstr "Tor / 匿名代理"
+
+msgid "Total Hits"
+msgstr "总命中"
+
+msgid "Total Uses"
+msgstr "调用次数"
+
+msgid "Type"
+msgstr "类型"
+
+msgid "Unauthorized"
+msgstr "无权限访问"
+
+msgid "Unique AI Visitors"
+msgstr "独立 AI 访客数"
+
+msgid "Unique Visitors"
+msgstr "独立访客"
+
+msgid "Unknown"
+msgstr "未知地区"
+
+#, php-format
+msgid "Visitor #%s"
+msgstr "访客 #%s"
+
+msgid "Visitor Countries"
+msgstr "访客国家 / 地区"
+
+msgid "Walkway / Entry"
+msgstr "过道 / 玄关"
+
+msgid "Wall Sconces"
+msgstr "壁灯"
+
+msgid "What They Asked For"
+msgstr "未匹配到的客户需求"
+
+#, php-format
+msgid "searches (%s hits)"
+msgstr "次选品 (共 %s 次请求)"

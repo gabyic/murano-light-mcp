@@ -487,21 +487,26 @@ class Murano_Light_MCP_Server {
 					$matched_count = count( $raw_list );
 				}
 
-				$seen_slugs = array();
+				$seen_variants = array();
 				foreach ( $raw_list as $v ) {
 					$slug = (string) ( $v['slug'] ?? '' );
 					$name = (string) ( $v['base_name'] ?? '' );
 					$sku  = (string) ( $v['sku'] ?? '' );
-					$dk   = $slug ?: ( $name ?: $sku );
-					if ( '' === $dk || isset( $seen_slugs[ $dk ] ) ) {
+					$vid  = (string) ( $v['variation_id'] ?? '' );
+					$pk   = $slug ?: ( $name ?: $sku );
+					$vk   = $pk . '|' . ( $sku ?: $vid );
+					if ( '' === $pk || isset( $seen_variants[ $vk ] ) ) {
 						continue;
 					}
-					$seen_slugs[ $dk ] = true;
-					$matched_items[]   = array(
+					$seen_variants[ $vk ] = true;
+					$matched_items[]      = array(
 						'slug' => $slug,
 						'name' => $name ?: $sku,
 						'sku'  => $sku,
 					);
+					if ( count( $matched_items ) >= 12 ) {
+						break;
+					}
 				}
 			}
 		} elseif ( 'resources/read' === $method ) {

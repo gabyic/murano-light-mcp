@@ -234,7 +234,7 @@ class Murano_Light_MCP_Analytics {
 		$day_key      = substr( $now_gmt, 0, 10 );
 
 		$matched_items = ! empty( $event['matched_items'] ) && is_array( $event['matched_items'] )
-			? wp_json_encode( array_slice( $event['matched_items'], 0, 10 ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
+			? wp_json_encode( array_slice( $event['matched_items'], 0, 12 ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
 			: null;
 
 		$wpdb->insert(
@@ -447,7 +447,8 @@ class Murano_Light_MCP_Analytics {
 			if ( ! is_array( $items ) ) {
 				continue;
 			}
-			$is_spec = ( 'get_fixture_specs' === $pr['tool_name'] );
+			$is_spec       = ( 'get_fixture_specs' === $pr['tool_name'] );
+			$seen_in_event = array();
 			foreach ( $items as $it ) {
 				$name = (string) ( $it['name'] ?? '' );
 				$sku  = (string) ( $it['sku'] ?? '' );
@@ -457,21 +458,29 @@ class Murano_Light_MCP_Analytics {
 					continue;
 				}
 				if ( ! isset( $product_map[ $key ] ) ) {
+					$fallback_parent = '' !== $sku ? (string) preg_replace( '/-\d{1,3}$/', '', $sku ) : '';
 					$product_map[ $key ] = array(
 						'name'         => $name ?: $sku,
 						'slug'         => $slug,
 						'product_id'   => 0,
-						'sample_sku'   => $sku,
+						'parent_sku'   => $fallback_parent,
+						'variant_skus' => array(),
 						'total_hits'   => 0,
 						'spec_lookups' => 0,
 						'rec_hits'     => 0,
 					);
 				}
-				$product_map[ $key ]['total_hits']++;
-				if ( $is_spec ) {
-					$product_map[ $key ]['spec_lookups']++;
-				} else {
-					$product_map[ $key ]['rec_hits']++;
+				if ( '' !== $sku ) {
+					$product_map[ $key ]['variant_skus'][ $sku ] = ( $product_map[ $key ]['variant_skus'][ $sku ] ?? 0 ) + 1;
+				}
+				if ( ! isset( $seen_in_event[ $key ] ) ) {
+					$seen_in_event[ $key ] = true;
+					$product_map[ $key ]['total_hits']++;
+					if ( $is_spec ) {
+						$product_map[ $key ]['spec_lookups']++;
+					} else {
+						$product_map[ $key ]['rec_hits']++;
+					}
 				}
 			}
 		}
@@ -488,21 +497,37 @@ class Murano_Light_MCP_Analytics {
 			$placeholders = implode( ',', array_fill( 0, count( $slugs ), '%s' ) );
 			$slug_rows    = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT ID, post_name FROM {$wpdb->posts} WHERE post_type = 'product' AND post_name IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					"SELECT p.ID, p.post_title, p.post_name, MAX(pm.meta_value) AS parent_sku
+					FROM {$wpdb->posts} p
+					LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_sku'
+					WHERE p.post_type = 'product' AND p.post_name IN ({$placeholders})
+					GROUP BY p.ID, p.post_title, p.post_name", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 					$slugs
 				),
 				ARRAY_A
 			);
-			$id_by_slug = array();
+			$meta_by_slug = array();
 			if ( is_array( $slug_rows ) ) {
 				foreach ( $slug_rows as $sr ) {
-					$id_by_slug[ (string) $sr['post_name'] ] = (int) $sr['ID'];
+					$meta_by_slug[ (string) $sr['post_name'] ] = array(
+						'id'         => (int) $sr['ID'],
+						'title'      => (string) $sr['post_title'],
+						'parent_sku' => (string) ( $sr['parent_sku'] ?? '' ),
+					);
 				}
 			}
 			foreach ( $top_products as &$tp ) {
-				if ( '' !== $tp['slug'] && isset( $id_by_slug[ $tp['slug'] ] ) ) {
-					$tp['product_id'] = $id_by_slug[ $tp['slug'] ];
+				if ( '' !== $tp['slug'] && isset( $meta_by_slug[ $tp['slug'] ] ) ) {
+					$m                = $meta_by_slug[ $tp['slug'] ];
+					$tp['product_id'] = $m['id'];
+					if ( '' !== $m['title'] ) {
+						$tp['name'] = $m['title'];
+					}
+					if ( '' !== $m['parent_sku'] ) {
+						$tp['parent_sku'] = $m['parent_sku'];
+					}
 				}
+				arsort( $tp['variant_skus'] );
 			}
 			unset( $tp );
 		}
