@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  node-mcp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm test
+      - run: npm pack --dry-run
+
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Lint all PHP files
+        run: find packages/wordpress-plugin -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan repository for private keys or credentials
+        run: |
+          if grep -rnE "BEGIN [A-Z ]*PRIVATE KEY|gh[po]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35}|service_account|wp_app_password" . --exclude-dir=.git --exclude-dir=.github; then
+            echo "Potential credential or private key detected!"
+            exit 1
+          fi
+          if find . -maxdepth 3 -name ".env*" -o -name "*.pem" -o -name "*.key" | grep -q .; then
+            echo "Sensitive credential file detected!"
+            exit 1
+          fi
+          echo "Secret scan passed."

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "murano-light": {
+      "url": "https://muranolamp.com/wp-json/murano-mcp/v1/mcp"
+    }
+  }
+}

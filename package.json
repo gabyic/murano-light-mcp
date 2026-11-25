@@ -1,0 +1,40 @@
+{
+  "name": "murano-light-mcp",
+  "version": "1.1.0",
+  "description": "Public read-only MCP (2025-03-26) server and WordPress/WooCommerce plugin for hand-blown Murano-style glass lighting discovery, variant-level sizing math, and buying guides.",
+  "type": "module",
+  "bin": {
+    "murano-light-mcp": "./packages/mcp-server/bin/murano-light-mcp.js"
+  },
+  "files": [
+    "packages/mcp-server/bin/murano-light-mcp.js",
+    "packages/mcp-server/src/feed-engine.js",
+    "packages/wordpress-plugin",
+    ".well-known",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test packages/mcp-server/test/mcp-protocol.test.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "woocommerce",
+    "wordpress",
+    "google-shopping-feed",
+    "lighting",
+    "ecommerce",
+    "murano-lamp"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gabyic/murano-light-mcp.git"
+  },
+  "homepage": "https://muranolamp.com"
+}

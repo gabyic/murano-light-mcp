@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "murano-light": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "murano-light-mcp"
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "murano-light-mcp",
+  "displayName": "Murano Lamp Lighting Catalog MCP",
+  "version": "1.0.0",
+  "protocolVersion": "2025-03-26",
+  "transport": {
+    "type": "streamable-http",
+    "endpoint": "https://muranolamp.com/wp-json/murano-mcp/v1/mcp"
+  },
+  "authentication": {
+    "type": "none",
+    "note": "Public read-only catalog, ceiling clearance calculator, and lighting guides."
+  },
+  "capabilities": [
+    "tools",
+    "resources",
+    "prompts"
+  ],
+  "llmsTxt": "https://muranolamp.com/llms.txt"
+}
