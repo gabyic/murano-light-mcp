@@ -3,7 +3,7 @@
  * Plugin Name: Murano Light MCP
  * Plugin URI: https://github.com/gabyic/murano-light-mcp
  * Description: Public read-only Model Context Protocol (MCP 2025-03-26) Streamable HTTP server for WooCommerce lighting stores. Feed-first variant-level indexing, ceiling clearance math, verified store policies, and privacy-preserving admin analytics.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: Murano Lamp
  * Author URI: https://muranolamp.com
  * License: MIT
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MURANO_MCP_VERSION', '1.3.0' );
+define( 'MURANO_MCP_VERSION', '1.3.1' );
 define( 'MURANO_MCP_PATH', plugin_dir_path( __FILE__ ) );
 
 require_once MURANO_MCP_PATH . 'includes/class-mcp-catalog.php';

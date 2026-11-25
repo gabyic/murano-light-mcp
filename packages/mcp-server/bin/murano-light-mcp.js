@@ -152,10 +152,23 @@ if (cfg.httpPort !== null) {
       return;
     }
     let body = '';
+    let bodyBytes = 0;
+    let tooLarge = false;
     req.on('data', (c) => {
-      body += c;
+      bodyBytes += Buffer.isBuffer(c) ? c.length : Buffer.byteLength(c, 'utf8');
+      if (bodyBytes > 65536) {
+        tooLarge = true;
+        body = '';
+        return;
+      }
+      if (!tooLarge) body += c;
     });
     req.on('end', async () => {
+      if (tooLarge) {
+        res.writeHead(413, headers);
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Payload too large (max 64 KB).' } }));
+        return;
+      }
       let msg;
       try {
         msg = JSON.parse(body);

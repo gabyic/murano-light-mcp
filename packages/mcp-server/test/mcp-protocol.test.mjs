@@ -196,6 +196,15 @@ test('Standalone Feed HTTP server handles MCP 2025-03-26 initialize, batch, noti
     assert.equal(batchJson[0].result.tools.length, 5);
     assert.ok(batchJson[0].result.tools[0].outputSchema);
     assert.equal(batchJson[1].result.structuredContent.warranty, '1-year warranty on materials and workmanship.');
+
+    // 64 KB request body cap check
+    const oversized = JSON.stringify({ jsonrpc: '2.0', id: 12, method: 'tools/list', pad: 'x'.repeat(70000) });
+    const bigRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Mcp-Session-Id': sid },
+      body: oversized,
+    });
+    assert.equal(bigRes.status, 413);
   } finally {
     child.kill();
     await fs.unlink(tmpFile);

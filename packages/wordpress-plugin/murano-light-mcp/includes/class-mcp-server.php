@@ -15,9 +15,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Murano_Light_MCP_Server {
 
-	const REST_NAMESPACE = 'murano-mcp/v1';
-	const REST_ROUTE     = '/mcp';
-	const PROTOCOL_VER   = '2025-03-26';
+	const REST_NAMESPACE      = 'murano-mcp/v1';
+	const REST_ROUTE          = '/mcp';
+	const PROTOCOL_VER        = '2025-03-26';
+	const MAX_BODY_BYTES      = 65536;
+	const DEFAULT_IP_RATE     = 60;
+	const DEFAULT_GLOBAL_RATE = 300;
 
 	public static function register_routes() {
 		register_rest_route(
@@ -91,7 +94,7 @@ class Murano_Light_MCP_Server {
 			'Access-Control-Allow-Origin'   => '*',
 			'Access-Control-Allow-Methods'  => 'POST, GET, OPTIONS',
 			'Access-Control-Allow-Headers'  => 'Content-Type, Accept, Mcp-Session-Id, MCP-Protocol-Version',
-			'Access-Control-Expose-Headers' => 'Mcp-Session-Id, X-RateLimit-Limit, X-RateLimit-Remaining',
+			'Access-Control-Expose-Headers' => 'Mcp-Session-Id, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Global-Limit, X-RateLimit-Global-Remaining, Retry-After',
 		);
 
 		if ( 'OPTIONS' === $request->get_method() ) {
@@ -105,6 +108,16 @@ class Murano_Light_MCP_Server {
 				403,
 				$headers
 			);
+		}
+
+		// Shared per-IP + site-wide global rate limit covers both GET probes and POST RPCs.
+		$rl                                      = self::check_rate_limit( 1 );
+		$headers['X-RateLimit-Limit']            = (string) $rl['limit'];
+		$headers['X-RateLimit-Remaining']        = (string) $rl['remaining'];
+		$headers['X-RateLimit-Global-Limit']     = (string) $rl['global_limit'];
+		$headers['X-RateLimit-Global-Remaining'] = (string) $rl['global_remaining'];
+		if ( ! $rl['allowed'] ) {
+			return self::respond_rate_limited( $request, $headers, $rl );
 		}
 
 		if ( 'GET' === $request->get_method() ) {
@@ -131,28 +144,16 @@ class Murano_Light_MCP_Server {
 			);
 		}
 
-		$rl = self::check_rate_limit();
-		$headers['X-RateLimit-Limit']     = (string) $rl['limit'];
-		$headers['X-RateLimit-Remaining'] = (string) $rl['remaining'];
-		if ( ! $rl['allowed'] ) {
-			self::log_event(
-				array(
-					'session_id'    => sanitize_text_field( (string) $request->get_header( 'mcp-session-id' ) ),
-					'rpc_method'    => 'rate_limited',
-					'tool_name'     => '',
-					'query_summary' => '429 rate limit exceeded',
-					'is_error'      => true,
-					'http_status'   => 429,
-				)
-			);
+		$raw       = (string) $request->get_body();
+		$max_bytes = (int) apply_filters( 'murano_mcp_max_body_bytes', self::MAX_BODY_BYTES );
+		if ( $max_bytes > 0 && strlen( $raw ) > $max_bytes ) {
 			return new WP_REST_Response(
-				self::rpc_error( null, -32029, 'Rate limit exceeded. Please retry in 60 seconds.' ),
-				429,
+				self::rpc_error( null, -32600, 'Payload too large (max 64 KB).' ),
+				413,
 				$headers
 			);
 		}
 
-		$raw  = $request->get_body();
 		$body = json_decode( $raw, true );
 		if ( ! is_array( $body ) ) {
 			return new WP_REST_Response(
@@ -169,15 +170,26 @@ class Murano_Light_MCP_Server {
 		}
 		$headers['Mcp-Session-Id'] = $session_id;
 
-		// Support JSON-RPC 2.0 batch arrays.
+		// Support JSON-RPC 2.0 batch arrays; deduct rate-limit cost per individual batch item.
 		$is_batch = array_keys( $body ) === range( 0, count( $body ) - 1 );
 		if ( $is_batch ) {
-			if ( empty( $body ) || count( $body ) > 20 ) {
+			$batch_count = count( $body );
+			if ( 0 === $batch_count || $batch_count > 20 ) {
 				return new WP_REST_Response(
 					self::rpc_error( null, -32600, 'Invalid batch size (1-20 allowed).' ),
 					400,
 					$headers
 				);
+			}
+			if ( $batch_count > 1 ) {
+				$batch_rl                                = self::check_rate_limit( $batch_count - 1 );
+				$headers['X-RateLimit-Limit']            = (string) $batch_rl['limit'];
+				$headers['X-RateLimit-Remaining']        = (string) $batch_rl['remaining'];
+				$headers['X-RateLimit-Global-Limit']     = (string) $batch_rl['global_limit'];
+				$headers['X-RateLimit-Global-Remaining'] = (string) $batch_rl['global_remaining'];
+				if ( ! $batch_rl['allowed'] ) {
+					return self::respond_rate_limited( $request, $headers, $batch_rl );
+				}
 			}
 			$replies = array();
 			foreach ( $body as $msg ) {
@@ -536,33 +548,134 @@ class Murano_Light_MCP_Server {
 		);
 	}
 
-	private static function check_rate_limit() {
-		$limit  = (int) apply_filters( 'murano_mcp_rate_limit_per_min', 60 );
-		if ( $limit <= 0 ) {
-			return array( 'allowed' => true, 'limit' => 0, 'remaining' => 999 );
+	/**
+	 * Build a throttled 429 response, logging at most 1 database event per IP (or global bucket) per minute.
+	 *
+	 * @param WP_REST_Request      $request Request object.
+	 * @param array<string,string> $headers Response headers.
+	 * @param array<string,mixed>  $rl Rate-limit decision payload.
+	 * @return WP_REST_Response
+	 */
+	private static function respond_rate_limited( $request, $headers, $rl ) {
+		$headers['Retry-After'] = '60';
+		$scope                  = (string) ( $rl['scope'] ?? 'ip' );
+
+		if ( self::should_log_rate_limit( self::get_client_ip(), $scope ) ) {
+			self::log_event(
+				array(
+					'session_id'    => sanitize_text_field( (string) $request->get_header( 'mcp-session-id' ) ),
+					'rpc_method'    => 'rate_limited',
+					'tool_name'     => '',
+					'query_summary' => '429 ' . $scope . ' rate limit exceeded',
+					'is_error'      => true,
+					'http_status'   => 429,
+				)
+			);
 		}
-		$ip     = self::get_client_ip();
+
+		$message = ( 'global' === $scope )
+			? 'Global endpoint rate limit exceeded. Please retry in 60 seconds.'
+			: 'Rate limit exceeded. Please retry in 60 seconds.';
+
+		return new WP_REST_Response(
+			self::rpc_error( null, -32029, $message ),
+			429,
+			$headers
+		);
+	}
+
+	/**
+	 * Guard against 429 database-write floods: only record 1 alert row per IP (or global scope) per minute.
+	 *
+	 * @param string $ip Client IP.
+	 * @param string $scope 'ip' or 'global'.
+	 * @return bool
+	 */
+	private static function should_log_rate_limit( $ip, $scope = 'ip' ) {
 		$bucket = gmdate( 'YmdHi' );
-		$key    = 'rl_' . md5( $ip . '_' . $bucket );
+		$key    = ( 'global' === $scope )
+			? 'rl_log_global_' . $bucket
+			: 'rl_log_' . md5( $ip . '_' . $bucket );
 
 		if ( wp_using_ext_object_cache() ) {
-			$cnt = wp_cache_get( $key, 'murano_mcp_rl' );
-			if ( false === $cnt ) {
-				wp_cache_set( $key, 1, 'murano_mcp_rl', 70 );
-				$cnt = 1;
-			} else {
-				$cnt = wp_cache_incr( $key, 1, 'murano_mcp_rl' );
-			}
-		} else {
-			$tkey = 'murano_mcp_' . $key;
-			$cnt  = (int) get_transient( $tkey ) + 1;
-			set_transient( $tkey, $cnt, 70 );
+			return (bool) wp_cache_add( $key, 1, 'murano_mcp_rl', 70 );
 		}
 
+		$tkey = 'murano_mcp_' . $key;
+		if ( false !== get_transient( $tkey ) ) {
+			return false;
+		}
+		set_transient( $tkey, 1, 70 );
+		return true;
+	}
+
+	/**
+	 * Atomically increment a per-minute rate-limit counter in object cache or transient fallback.
+	 *
+	 * @param string $bucket_key Cache bucket identifier.
+	 * @param int    $cost Number of units to add.
+	 * @param int    $ttl Expiry in seconds.
+	 * @return int Updated counter value.
+	 */
+	private static function increment_bucket_counter( $bucket_key, $cost, $ttl = 70 ) {
+		$cost = max( 1, (int) $cost );
+		if ( wp_using_ext_object_cache() ) {
+			if ( wp_cache_add( $bucket_key, $cost, 'murano_mcp_rl', $ttl ) ) {
+				return $cost;
+			}
+			$val = wp_cache_incr( $bucket_key, $cost, 'murano_mcp_rl' );
+			if ( false === $val ) {
+				wp_cache_set( $bucket_key, $cost, 'murano_mcp_rl', $ttl );
+				return $cost;
+			}
+			return (int) $val;
+		}
+
+		$tkey = 'murano_mcp_' . $bucket_key;
+		$cnt  = (int) get_transient( $tkey ) + $cost;
+		set_transient( $tkey, $cnt, $ttl );
+		return $cnt;
+	}
+
+	/**
+	 * Enforce both per-IP (default 60/min) and site-wide global (default 300/min) rate limits.
+	 *
+	 * @param int $cost Quota units consumed (1 for GET/single POST; batch size for batch POSTs).
+	 * @return array<string, mixed>
+	 */
+	private static function check_rate_limit( $cost = 1 ) {
+		$cost         = max( 1, (int) $cost );
+		$ip_limit     = (int) apply_filters( 'murano_mcp_rate_limit_per_min', self::DEFAULT_IP_RATE );
+		$global_limit = (int) apply_filters( 'murano_mcp_global_rate_limit_per_min', self::DEFAULT_GLOBAL_RATE );
+		$bucket       = gmdate( 'YmdHi' );
+
+		$ip_remaining     = 999;
+		$ip_allowed       = true;
+		$global_remaining = 999;
+		$global_allowed   = true;
+
+		if ( $ip_limit > 0 ) {
+			$ip_cnt       = self::increment_bucket_counter( 'rl_ip_' . md5( self::get_client_ip() . '_' . $bucket ), $cost );
+			$ip_allowed   = ( $ip_cnt <= $ip_limit );
+			$ip_remaining = max( 0, $ip_limit - $ip_cnt );
+		}
+
+		if ( $global_limit > 0 ) {
+			$global_cnt       = self::increment_bucket_counter( 'rl_global_' . $bucket, $cost );
+			$global_allowed   = ( $global_cnt <= $global_limit );
+			$global_remaining = max( 0, $global_limit - $global_cnt );
+		}
+
+		$allowed = $ip_allowed && $global_allowed;
+		$scope   = ! $global_allowed ? 'global' : 'ip';
+
 		return array(
-			'allowed'   => ( $cnt <= $limit ),
-			'limit'     => $limit,
-			'remaining' => max( 0, $limit - $cnt ),
+			'allowed'          => $allowed,
+			'scope'            => $scope,
+			'limit'            => max( 0, $ip_limit ),
+			'remaining'        => $ip_remaining,
+			'global_limit'     => max( 0, $global_limit ),
+			'global_remaining' => $global_remaining,
 		);
 	}
 
