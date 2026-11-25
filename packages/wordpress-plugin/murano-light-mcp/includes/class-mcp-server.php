@@ -135,6 +135,16 @@ class Murano_Light_MCP_Server {
 		$headers['X-RateLimit-Limit']     = (string) $rl['limit'];
 		$headers['X-RateLimit-Remaining'] = (string) $rl['remaining'];
 		if ( ! $rl['allowed'] ) {
+			self::log_event(
+				array(
+					'session_id'    => sanitize_text_field( (string) $request->get_header( 'mcp-session-id' ) ),
+					'rpc_method'    => 'rate_limited',
+					'tool_name'     => '',
+					'query_summary' => '429 rate limit exceeded',
+					'is_error'      => true,
+					'http_status'   => 429,
+				)
+			);
 			return new WP_REST_Response(
 				self::rpc_error( null, -32029, 'Rate limit exceeded. Please retry in 60 seconds.' ),
 				429,
@@ -171,7 +181,7 @@ class Murano_Light_MCP_Server {
 			}
 			$replies = array();
 			foreach ( $body as $msg ) {
-				$one = self::process_single_message( $msg );
+				$one = self::process_single_message( $msg, $session_id );
 				if ( null !== $one ) {
 					$replies[] = $one;
 				}
@@ -182,14 +192,14 @@ class Murano_Light_MCP_Server {
 			return new WP_REST_Response( $replies, 200, $headers );
 		}
 
-		$reply = self::process_single_message( $body );
+		$reply = self::process_single_message( $body, $session_id );
 		if ( null === $reply ) {
 			return new WP_REST_Response( null, 202, $headers );
 		}
 		return new WP_REST_Response( $reply, 200, $headers );
 	}
 
-	private static function process_single_message( $msg ) {
+	private static function process_single_message( $msg, $session_id = '' ) {
 		if ( ! is_array( $msg ) || ( $msg['jsonrpc'] ?? '' ) !== '2.0' || empty( $msg['method'] ) ) {
 			return self::rpc_error( $msg['id'] ?? null, -32600, 'Invalid JSON-RPC 2.0 Request.' );
 		}
@@ -200,7 +210,9 @@ class Murano_Light_MCP_Server {
 		if ( null === $id && 0 === strpos( $method, 'notifications/' ) ) {
 			return null;
 		}
-		return self::dispatch_rpc( $id, $method, $params );
+		$reply = self::dispatch_rpc( $id, $method, $params );
+		self::record_rpc_analytics( $method, $params, $reply, $session_id );
+		return $reply;
 	}
 
 	/**
@@ -386,12 +398,99 @@ class Murano_Light_MCP_Server {
 		return true;
 	}
 
+	private static function get_client_ip() {
+		return sanitize_text_field( (string) ( $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) );
+	}
+
+	private static function log_event( $event ) {
+		if ( ! class_exists( 'Murano_Light_MCP_Analytics' ) ) {
+			return;
+		}
+		$event['ip'] = self::get_client_ip();
+		Murano_Light_MCP_Analytics::record_event( $event );
+	}
+
+	private static function record_rpc_analytics( $method, $params, $reply, $session_id ) {
+		if ( ! in_array( $method, array( 'initialize', 'tools/call', 'resources/read', 'prompts/get' ), true ) ) {
+			return;
+		}
+
+		$tool_name     = '';
+		$query_summary = '';
+		$matched_items = array();
+		$matched_count = 0;
+		$is_error      = ! empty( $reply['error'] ) || ! empty( $reply['result']['isError'] );
+
+		if ( 'tools/call' === $method ) {
+			$tool_name = (string) ( $params['name'] ?? '' );
+			$args      = isset( $params['arguments'] ) && is_array( $params['arguments'] ) ? $params['arguments'] : array();
+			$parts     = array();
+			foreach ( $args as $k => $v ) {
+				if ( '' !== (string) $v && ! is_array( $v ) ) {
+					$parts[] = sanitize_key( $k ) . '=' . sanitize_text_field( (string) $v );
+				}
+			}
+			$query_summary = implode( ', ', $parts );
+
+			$sc = $reply['result']['structuredContent'] ?? array();
+			if ( is_array( $sc ) ) {
+				$raw_list = array();
+				if ( ! empty( $sc['variants'] ) && is_array( $sc['variants'] ) ) {
+					$raw_list      = $sc['variants'];
+					$matched_count = (int) ( $sc['total_matched_variants'] ?? count( $raw_list ) );
+				} elseif ( ! empty( $sc['recommended_variants'] ) && is_array( $sc['recommended_variants'] ) ) {
+					$raw_list      = $sc['recommended_variants'];
+					$matched_count = count( $raw_list );
+				}
+
+				$seen_slugs = array();
+				foreach ( $raw_list as $v ) {
+					$slug = (string) ( $v['slug'] ?? '' );
+					$name = (string) ( $v['base_name'] ?? '' );
+					$sku  = (string) ( $v['sku'] ?? '' );
+					$dk   = $slug ?: ( $name ?: $sku );
+					if ( '' === $dk || isset( $seen_slugs[ $dk ] ) ) {
+						continue;
+					}
+					$seen_slugs[ $dk ] = true;
+					$matched_items[]   = array(
+						'slug' => $slug,
+						'name' => $name ?: $sku,
+						'sku'  => $sku,
+					);
+				}
+			}
+		} elseif ( 'resources/read' === $method ) {
+			$tool_name     = (string) ( $params['uri'] ?? '' );
+			$query_summary = $tool_name;
+			$matched_count = $is_error ? 0 : 1;
+		} elseif ( 'prompts/get' === $method ) {
+			$tool_name     = (string) ( $params['name'] ?? '' );
+			$pargs         = isset( $params['arguments'] ) && is_array( $params['arguments'] ) ? $params['arguments'] : array();
+			$query_summary = trim( (string) ( $pargs['room'] ?? '' ) . ' ' . (string) ( $pargs['ceiling_height_ft'] ?? '' ) );
+			$matched_count = $is_error ? 0 : 1;
+		}
+
+		self::log_event(
+			array(
+				'session_id'    => $session_id,
+				'rpc_method'    => $method,
+				'tool_name'     => $tool_name,
+				'query_summary' => $query_summary,
+				'matched_items' => $matched_items,
+				'matched_count' => $matched_count,
+				'is_error'      => $is_error,
+				'http_status'   => 200,
+			)
+		);
+	}
+
 	private static function check_rate_limit() {
 		$limit  = (int) apply_filters( 'murano_mcp_rate_limit_per_min', 60 );
 		if ( $limit <= 0 ) {
 			return array( 'allowed' => true, 'limit' => 0, 'remaining' => 999 );
 		}
-		$ip     = sanitize_text_field( (string) ( $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) );
+		$ip     = self::get_client_ip();
 		$bucket = gmdate( 'YmdHi' );
 		$key    = 'rl_' . md5( $ip . '_' . $bucket );
 
