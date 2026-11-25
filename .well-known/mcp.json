@@ -1,7 +1,7 @@
 {
   "name": "murano-light-mcp",
   "displayName": "Murano Lamp Lighting Catalog MCP",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "protocolVersion": "2025-03-26",
   "transport": {
     "type": "streamable-http",

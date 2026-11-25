@@ -3,7 +3,8 @@
  * Privacy-preserving analytics storage and aggregation for Murano Light MCP.
  *
  * Stores anonymized caller hashes (SHA-256 of IP + WordPress nonce salt, never raw IPs),
- * tool usage, query parameter summaries, and matched product hits in a dedicated table.
+ * ISO-3166-1 alpha-2 country codes (for geographic demand visibility without IP PII),
+ * tool usage, query parameter summaries, zero-match demand gaps, and matched product hits.
  * Automatically prunes events older than 90 days.
  *
  * @package Murano_Light_MCP
@@ -15,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Murano_Light_MCP_Analytics {
 
-	const DB_VERSION        = '1.2.0';
+	const DB_VERSION        = '1.3.0';
 	const DB_VERSION_OPTION = 'murano_mcp_db_version';
 	const RETENTION_DAYS    = 90;
 
@@ -40,7 +41,7 @@ class Murano_Light_MCP_Analytics {
 	}
 
 	/**
-	 * Run dbDelta to create the events table.
+	 * Run dbDelta to create or migrate the events table.
 	 */
 	public static function install_table() {
 		global $wpdb;
@@ -54,6 +55,7 @@ class Murano_Light_MCP_Analytics {
 			created_at datetime NOT NULL,
 			day_key date NOT NULL,
 			caller_hash char(64) NOT NULL,
+			country_code char(2) NOT NULL DEFAULT '',
 			session_id varchar(64) NOT NULL DEFAULT '',
 			rpc_method varchar(40) NOT NULL DEFAULT '',
 			tool_name varchar(64) NOT NULL DEFAULT '',
@@ -65,11 +67,141 @@ class Murano_Light_MCP_Analytics {
 			PRIMARY KEY  (id),
 			KEY idx_day_method (day_key, rpc_method),
 			KEY idx_tool_day (tool_name, day_key),
-			KEY idx_caller_day (caller_hash, day_key)
+			KEY idx_caller_day (caller_hash, day_key),
+			KEY idx_country_day (country_code, day_key)
 		) {$charset_collate};";
 
 		dbDelta( $sql );
 		update_option( self::DB_VERSION_OPTION, self::DB_VERSION, true );
+	}
+
+	/**
+	 * Validate and normalize an ISO-3166-1 alpha-2 country code.
+	 *
+	 * @param string $code Raw header or GeoIP country code.
+	 * @return string Uppercase 2-letter code, or empty string if unknown.
+	 */
+	public static function sanitize_country_code( $code ) {
+		$norm = strtoupper( trim( (string) $code ) );
+		if ( 'XX' === $norm || '' === $norm ) {
+			return '';
+		}
+		// Allow T1 (Cloudflare Tor indicator) and standard two-letter alpha-2 codes.
+		if ( 'T1' === $norm || preg_match( '/^[A-Z]{2}$/', $norm ) ) {
+			return $norm;
+		}
+		return '';
+	}
+
+	/**
+	 * Convert a 2-letter ISO code into a UTF-8 flag emoji without external libraries.
+	 *
+	 * @param string $code Normalized uppercase 2-letter code.
+	 * @return string
+	 */
+	public static function country_flag_emoji( $code ) {
+		$code = self::sanitize_country_code( $code );
+		if ( '' === $code ) {
+			return '🌐';
+		}
+		if ( 'T1' === $code ) {
+			return '🛡️';
+		}
+		$a    = ord( $code[0] ) - 65;
+		$b    = ord( $code[1] ) - 65;
+		$char = static function ( $idx ) {
+			return "\xF0\x9F\x87" . chr( 0xA6 + $idx );
+		};
+		return $char( $a ) . $char( $b );
+	}
+
+	/**
+	 * Return display metadata (code, flag, localized name) for a country code.
+	 *
+	 * @param string $code Two-letter country code.
+	 * @return array{code: string, flag: string, name: string}
+	 */
+	public static function format_country( $code ) {
+		$code = self::sanitize_country_code( $code );
+		$flag = self::country_flag_emoji( $code );
+
+		if ( '' === $code ) {
+			return array(
+				'code' => '',
+				'flag' => $flag,
+				'name' => __( 'Unknown', 'murano-light-mcp' ),
+			);
+		}
+		if ( 'T1' === $code ) {
+			return array(
+				'code' => 'T1',
+				'flag' => $flag,
+				'name' => __( 'Tor / Anon Proxy', 'murano-light-mcp' ),
+			);
+		}
+
+		$name = '';
+		if ( class_exists( 'Locale' ) && method_exists( 'Locale', 'getDisplayRegion' ) ) {
+			$locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+			$region = \Locale::getDisplayRegion( '-' . $code, (string) $locale );
+			if ( is_string( $region ) && '' !== $region && strtoupper( $region ) !== $code ) {
+				$name = $region;
+			}
+		}
+
+		if ( '' === $name ) {
+			$fallback = array(
+				'US' => 'United States',
+				'CA' => 'Canada',
+				'GB' => 'United Kingdom',
+				'AU' => 'Australia',
+				'NZ' => 'New Zealand',
+				'DE' => 'Germany',
+				'FR' => 'France',
+				'IT' => 'Italy',
+				'ES' => 'Spain',
+				'NL' => 'Netherlands',
+				'BE' => 'Belgium',
+				'CH' => 'Switzerland',
+				'AT' => 'Austria',
+				'SE' => 'Sweden',
+				'NO' => 'Norway',
+				'DK' => 'Denmark',
+				'FI' => 'Finland',
+				'IE' => 'Ireland',
+				'PT' => 'Portugal',
+				'PL' => 'Poland',
+				'GR' => 'Greece',
+				'CN' => 'China',
+				'HK' => 'Hong Kong',
+				'TW' => 'Taiwan',
+				'JP' => 'Japan',
+				'KR' => 'South Korea',
+				'SG' => 'Singapore',
+				'MY' => 'Malaysia',
+				'TH' => 'Thailand',
+				'VN' => 'Vietnam',
+				'ID' => 'Indonesia',
+				'PH' => 'Philippines',
+				'IN' => 'India',
+				'AE' => 'United Arab Emirates',
+				'SA' => 'Saudi Arabia',
+				'IL' => 'Israel',
+				'TR' => 'Turkey',
+				'BR' => 'Brazil',
+				'MX' => 'Mexico',
+				'AR' => 'Argentina',
+				'CL' => 'Chile',
+				'ZA' => 'South Africa',
+			);
+			$name     = $fallback[ $code ] ?? $code;
+		}
+
+		return array(
+			'code' => $code,
+			'flag' => $flag,
+			'name' => $name,
+		);
 	}
 
 	/**
@@ -95,10 +227,11 @@ class Murano_Light_MCP_Analytics {
 		}
 		self::maybe_install();
 
-		$ip          = (string) ( $event['ip'] ?? '0.0.0.0' );
-		$caller_hash = self::hash_caller( $ip );
-		$now_gmt     = current_time( 'mysql', true );
-		$day_key     = substr( $now_gmt, 0, 10 );
+		$ip           = (string) ( $event['ip'] ?? '0.0.0.0' );
+		$caller_hash  = self::hash_caller( $ip );
+		$country_code = self::sanitize_country_code( (string) ( $event['country_code'] ?? '' ) );
+		$now_gmt      = current_time( 'mysql', true );
+		$day_key      = substr( $now_gmt, 0, 10 );
 
 		$matched_items = ! empty( $event['matched_items'] ) && is_array( $event['matched_items'] )
 			? wp_json_encode( array_slice( $event['matched_items'], 0, 10 ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
@@ -110,6 +243,7 @@ class Murano_Light_MCP_Analytics {
 				'created_at'    => $now_gmt,
 				'day_key'       => $day_key,
 				'caller_hash'   => $caller_hash,
+				'country_code'  => $country_code,
 				'session_id'    => substr( sanitize_text_field( (string) ( $event['session_id'] ?? '' ) ), 0, 64 ),
 				'rpc_method'    => substr( sanitize_text_field( (string) ( $event['rpc_method'] ?? '' ) ), 0, 40 ),
 				'tool_name'     => substr( sanitize_text_field( (string) ( $event['tool_name'] ?? '' ) ), 0, 64 ),
@@ -119,7 +253,7 @@ class Murano_Light_MCP_Analytics {
 				'is_error'      => ! empty( $event['is_error'] ) ? 1 : 0,
 				'http_status'   => max( 100, (int) ( $event['http_status'] ?? 200 ) ),
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )
 		);
 
 		// Probabilistic cleanup (~1% of requests) for records older than retention window.
@@ -141,16 +275,21 @@ class Murano_Light_MCP_Analytics {
 	/**
 	 * Aggregate dashboard statistics for the requested day window (1, 7, or 30).
 	 *
-	 * @param int $days Number of days including today UTC.
+	 * @param int    $days Number of days including today UTC.
+	 * @param string $log_filter Filter for recent activity log ('all', 'zero', 'errors').
+	 * @param string $log_tool Optional exact tool_name or rpc_method filter for recent log.
 	 * @return array<string, mixed>
 	 */
-	public static function get_dashboard_stats( $days = 7 ) {
+	public static function get_dashboard_stats( $days = 7, $log_filter = 'all', $log_tool = '' ) {
 		global $wpdb;
 		self::maybe_install();
 
-		$days  = max( 1, min( 90, (int) $days ) );
-		$since = gmdate( 'Y-m-d', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
-		$table = self::table_name();
+		$days       = max( 1, min( 90, (int) $days ) );
+		$since      = gmdate( 'Y-m-d', time() - ( ( $days - 1 ) * DAY_IN_SECONDS ) );
+		$today      = gmdate( 'Y-m-d' );
+		$table      = self::table_name();
+		$log_filter = in_array( $log_filter, array( 'all', 'zero', 'errors' ), true ) ? $log_filter : 'all';
+		$log_tool   = sanitize_text_field( (string) $log_tool );
 
 		$biz_methods = "'tools/call','resources/read','prompts/get'";
 
@@ -171,8 +310,8 @@ class Murano_Light_MCP_Analytics {
 			ARRAY_A
 		);
 
-		// 2. Daily trend.
-		$daily = $wpdb->get_results(
+		// 2. Daily trend (chronological ascending, gap-filled across the full window).
+		$daily_raw = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
 					day_key,
@@ -182,13 +321,56 @@ class Murano_Light_MCP_Analytics {
 				FROM {$table}
 				WHERE day_key >= %s
 				GROUP BY day_key
-				ORDER BY day_key DESC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				ORDER BY day_key ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$since
+			),
+			ARRAY_A
+		);
+		$daily_map = array();
+		if ( is_array( $daily_raw ) ) {
+			foreach ( $daily_raw as $row ) {
+				$daily_map[ (string) $row['day_key'] ] = array(
+					'day_key'        => (string) $row['day_key'],
+					'total_requests' => (int) $row['total_requests'],
+					'business_calls' => (int) $row['business_calls'],
+					'unique_callers' => (int) $row['unique_callers'],
+				);
+			}
+		}
+		$daily_trend = array();
+		$cursor_ts   = strtotime( $since . ' 00:00:00 UTC' );
+		$end_ts      = strtotime( $today . ' 00:00:00 UTC' );
+		while ( $cursor_ts <= $end_ts ) {
+			$dk            = gmdate( 'Y-m-d', $cursor_ts );
+			$daily_trend[] = $daily_map[ $dk ] ?? array(
+				'day_key'        => $dk,
+				'total_requests' => 0,
+				'business_calls' => 0,
+				'unique_callers' => 0,
+			);
+			$cursor_ts    += DAY_IN_SECONDS;
+		}
+
+		// 3. Country distribution (anonymous geographic demand signal).
+		$countries = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT
+					country_code,
+					COUNT(*) AS total_requests,
+					SUM(CASE WHEN rpc_method IN ({$biz_methods}) THEN 1 ELSE 0 END) AS business_calls,
+					COUNT(DISTINCT caller_hash) AS unique_callers,
+					SUM(CASE WHEN rpc_method = 'tools/call' AND tool_name IN ('search_fixtures','get_fixture_specs') AND matched_count = 0 THEN 1 ELSE 0 END) AS zero_match_calls
+				FROM {$table}
+				WHERE day_key >= %s
+				GROUP BY country_code
+				ORDER BY business_calls DESC, total_requests DESC
+				LIMIT 10", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$since
 			),
 			ARRAY_A
 		);
 
-		// 3. Tool / resource breakdown.
+		// 4. Tool / resource breakdown.
 		$tools = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
@@ -206,7 +388,7 @@ class Murano_Light_MCP_Analytics {
 			ARRAY_A
 		);
 
-		// 4. Top queried parameters.
+		// 5. Top queried parameters (all tools/call).
 		$top_queries = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT
@@ -224,7 +406,29 @@ class Murano_Light_MCP_Analytics {
 			ARRAY_A
 		);
 
-		// 5. Top products (aggregated across matched_items JSON).
+		// 6. Zero-match demand gaps (actionable missed-inventory / content opportunities).
+		$zero_match_queries = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT
+					tool_name,
+					query_summary,
+					COUNT(*) AS hits,
+					MAX(created_at) AS last_seen
+				FROM {$table}
+				WHERE day_key >= %s
+					AND rpc_method = 'tools/call'
+					AND tool_name IN ('search_fixtures','get_fixture_specs')
+					AND matched_count = 0
+					AND query_summary <> ''
+				GROUP BY tool_name, query_summary
+				ORDER BY hits DESC, last_seen DESC
+				LIMIT 15", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$since
+			),
+			ARRAY_A
+		);
+
+		// 7. Top products (aggregated across matched_items JSON + single batch edit-ID lookup).
 		$prod_rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT tool_name, matched_items
@@ -256,6 +460,7 @@ class Murano_Light_MCP_Analytics {
 					$product_map[ $key ] = array(
 						'name'         => $name ?: $sku,
 						'slug'         => $slug,
+						'product_id'   => 0,
 						'sample_sku'   => $sku,
 						'total_hits'   => 0,
 						'spec_lookups' => 0,
@@ -276,36 +481,81 @@ class Murano_Light_MCP_Analytics {
 				return $b['total_hits'] <=> $a['total_hits'];
 			}
 		);
+		$top_products = array_slice( array_values( $product_map ), 0, 15 );
 
-		// 6. Recent 25 business calls.
-		$recent = $wpdb->get_results(
+		$slugs = array_values( array_unique( array_filter( array_column( $top_products, 'slug' ) ) ) );
+		if ( ! empty( $slugs ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $slugs ), '%s' ) );
+			$slug_rows    = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT ID, post_name FROM {$wpdb->posts} WHERE post_type = 'product' AND post_name IN ({$placeholders})", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$slugs
+				),
+				ARRAY_A
+			);
+			$id_by_slug = array();
+			if ( is_array( $slug_rows ) ) {
+				foreach ( $slug_rows as $sr ) {
+					$id_by_slug[ (string) $sr['post_name'] ] = (int) $sr['ID'];
+				}
+			}
+			foreach ( $top_products as &$tp ) {
+				if ( '' !== $tp['slug'] && isset( $id_by_slug[ $tp['slug'] ] ) ) {
+					$tp['product_id'] = $id_by_slug[ $tp['slug'] ];
+				}
+			}
+			unset( $tp );
+		}
+
+		// 8. Recent 30 activity events with optional status / tool filter.
+		$where_parts = array( 'day_key >= %s' );
+		$where_args  = array( $since );
+
+		if ( 'zero' === $log_filter ) {
+			$where_parts[] = "rpc_method = 'tools/call' AND tool_name IN ('search_fixtures','get_fixture_specs') AND matched_count = 0";
+		} elseif ( 'errors' === $log_filter ) {
+			$where_parts[] = '(is_error = 1 OR http_status >= 400)';
+		} else {
+			$where_parts[] = "(rpc_method IN ({$biz_methods}) OR rpc_method = 'rate_limited')";
+		}
+
+		if ( '' !== $log_tool ) {
+			$where_parts[] = '(tool_name = %s OR rpc_method = %s)';
+			$where_args[]  = $log_tool;
+			$where_args[]  = $log_tool;
+		}
+
+		$where_sql = implode( ' AND ', $where_parts );
+		$recent    = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT created_at, caller_hash, rpc_method, tool_name, query_summary, matched_count, is_error, http_status
+				"SELECT created_at, caller_hash, country_code, rpc_method, tool_name, query_summary, matched_count, is_error, http_status
 				FROM {$table}
-				WHERE day_key >= %s AND rpc_method IN ({$biz_methods})
+				WHERE {$where_sql}
 				ORDER BY id DESC
-				LIMIT 25", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$since
+				LIMIT 30", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$where_args
 			),
 			ARRAY_A
 		);
 
 		return array(
-			'days'          => $days,
-			'since'         => $since,
-			'summary'       => array(
-				'total_requests'  => (int) ( $summary['total_requests'] ?? 0 ),
-				'business_calls'  => (int) ( $summary['business_calls'] ?? 0 ),
-				'unique_callers'  => (int) ( $summary['unique_callers'] ?? 0 ),
-				'unique_sessions' => (int) ( $summary['unique_sessions'] ?? 0 ),
-				'zero_match_calls'=> (int) ( $summary['zero_match_calls'] ?? 0 ),
-				'error_calls'     => (int) ( $summary['error_calls'] ?? 0 ),
+			'days'               => $days,
+			'since'              => $since,
+			'summary'            => array(
+				'total_requests'   => (int) ( $summary['total_requests'] ?? 0 ),
+				'business_calls'   => (int) ( $summary['business_calls'] ?? 0 ),
+				'unique_callers'   => (int) ( $summary['unique_callers'] ?? 0 ),
+				'unique_sessions'  => (int) ( $summary['unique_sessions'] ?? 0 ),
+				'zero_match_calls' => (int) ( $summary['zero_match_calls'] ?? 0 ),
+				'error_calls'      => (int) ( $summary['error_calls'] ?? 0 ),
 			),
-			'daily_trend'   => is_array( $daily ) ? $daily : array(),
-			'tools'         => is_array( $tools ) ? $tools : array(),
-			'top_products'  => array_slice( array_values( $product_map ), 0, 15 ),
-			'top_queries'   => is_array( $top_queries ) ? $top_queries : array(),
-			'recent_events' => is_array( $recent ) ? $recent : array(),
+			'daily_trend'        => $daily_trend,
+			'top_countries'      => is_array( $countries ) ? $countries : array(),
+			'tools'              => is_array( $tools ) ? $tools : array(),
+			'top_products'       => $top_products,
+			'top_queries'        => is_array( $top_queries ) ? $top_queries : array(),
+			'zero_match_queries' => is_array( $zero_match_queries ) ? $zero_match_queries : array(),
+			'recent_events'      => is_array( $recent ) ? $recent : array(),
 		);
 	}
 }

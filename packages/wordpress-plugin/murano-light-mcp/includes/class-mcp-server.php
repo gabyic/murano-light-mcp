@@ -402,11 +402,55 @@ class Murano_Light_MCP_Server {
 		return sanitize_text_field( (string) ( $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0' ) );
 	}
 
+	/**
+	 * Resolve ISO-3166-1 alpha-2 country code from CDN/proxy headers or local WooCommerce GeoIP.
+	 *
+	 * Never performs external HTTP lookups during JSON-RPC execution.
+	 *
+	 * @param string $ip Client IP used only for in-memory local GeoIP lookup.
+	 * @return string Two-letter uppercase country code or empty string.
+	 */
+	private static function get_client_country( $ip = '' ) {
+		$header_keys = array(
+			'HTTP_CF_IPCOUNTRY',
+			'HTTP_X_VERCEL_IP_COUNTRY',
+			'HTTP_CLOUDFRONT_VIEWER_COUNTRY',
+			'HTTP_GEOIP_COUNTRY_CODE',
+			'HTTP_X_COUNTRY_CODE',
+		);
+
+		foreach ( $header_keys as $hkey ) {
+			if ( empty( $_SERVER[ $hkey ] ) ) {
+				continue;
+			}
+			$code = Murano_Light_MCP_Analytics::sanitize_country_code( (string) wp_unslash( $_SERVER[ $hkey ] ) );
+			if ( '' !== $code ) {
+				return (string) apply_filters( 'murano_mcp_client_country', $code, $ip );
+			}
+		}
+
+		$code = '';
+		if ( '' !== $ip && class_exists( 'WC_Geolocation' ) && method_exists( 'WC_Geolocation', 'geolocate_ip' ) ) {
+			try {
+				$geo = WC_Geolocation::geolocate_ip( $ip, false, false );
+				if ( is_array( $geo ) && ! empty( $geo['country'] ) ) {
+					$code = Murano_Light_MCP_Analytics::sanitize_country_code( (string) $geo['country'] );
+				}
+			} catch ( \Throwable $e ) {
+				$code = '';
+			}
+		}
+
+		return (string) apply_filters( 'murano_mcp_client_country', $code, $ip );
+	}
+
 	private static function log_event( $event ) {
 		if ( ! class_exists( 'Murano_Light_MCP_Analytics' ) ) {
 			return;
 		}
-		$event['ip'] = self::get_client_ip();
+		$ip                    = self::get_client_ip();
+		$event['ip']           = $ip;
+		$event['country_code'] = self::get_client_country( $ip );
 		Murano_Light_MCP_Analytics::record_event( $event );
 	}
 

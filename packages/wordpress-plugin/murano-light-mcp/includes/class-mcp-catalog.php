@@ -53,6 +53,20 @@ class Murano_Light_MCP_Catalog {
 	}
 
 	/**
+	 * Return lightweight catalog index summary for the admin dashboard.
+	 *
+	 * @return array{variant_count: int, source: string}
+	 */
+	public static function get_catalog_stats() {
+		$variants = self::get_variants();
+		$source   = ! empty( $variants[0]['data_source'] ) ? (string) $variants[0]['data_source'] : 'woocommerce';
+		return array(
+			'variant_count' => count( $variants ),
+			'source'        => $source,
+		);
+	}
+
+	/**
 	 * Locate and parse a local Google Shopping XML feed if available.
 	 *
 	 * @return array<int, array<string, mixed>>

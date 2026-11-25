@@ -17,7 +17,7 @@ Built for AI assistants (Claude Desktop, Cursor, ChatGPT/Perplexity agents, and 
 - **MCP `2025-03-26` Streamable HTTP Compliance**: Full `inputSchema` + `outputSchema` + read-only `annotations`, `Mcp-Session-Id` propagation, JSON-RPC batch support, HTTP `202` notifications, `Origin` DNS-rebinding guard, and `DONOTCACHEPAGE` / `Cache-Control: no-store` isolation.
 - **Anti-Hallucination Contract**: Unlisted product specs (weight, wattage, chain length, ceiling rating) are returned explicitly as `null` so client models never fabricate unverified data.
 - **Two Deployment Modes**:
-  1. **WordPress Plugin** (`packages/wordpress-plugin/murano-light-mcp/`): Self-contained plugin with object-cache-aware IP rate limiting, `/.well-known/mcp.json` serving, and an admin-only **Murano MCP** analytics dashboard (call volume, anonymized unique callers, top requested products, and popular query parameters).
+  1. **WordPress Plugin** (`packages/wordpress-plugin/murano-light-mcp/`): Self-contained plugin with object-cache-aware IP rate limiting, `/.well-known/mcp.json` serving, and an admin-only **Murano MCP** analytics dashboard (daily trend bars, ISO-3166 caller countries without storing raw IPs, zero-match demand gap alerts, top requested products, and live endpoint self-test, localized in English and `zh_CN`).
   2. **Standalone `npx` CLI** (`packages/mcp-server/`): Zero-dependency Node 18+ stdio bridge (`--endpoint`) OR standalone feed server (`--feed-url` / `--feed-file` + optional `--http <port>`).
 
 ---
